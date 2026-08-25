@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Frontend / UI Build & Dependencies
+node_modules/
+dist/
+dist-ssr/
+.output/
+.nitro/
+.tanstack/
+.vinxi/
+
+# Assets & Uploaded files
+src/assets/*.pdf
+src/src/assets/*.pdf
+assets/*.pdf
+
