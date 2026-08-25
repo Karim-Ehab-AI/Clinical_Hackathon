@@ -1,0 +1,708 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "clinical-rag",
+    "description": "Clinical RAG MVP API - Ingestion & Hybrid Retrieval + Reranking Services",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/ingestion/upload": {
+      "post": {
+        "tags": [
+          "Ingestion Pipeline"
+        ],
+        "summary": "Upload and ingest a clinical PDF document",
+        "description": "Parses PDF via Docling, cleans page furniture, performs structure-aware chunking with BAAI/bge-m3 tokenizer, extracts NICE/ESC metadata, generates dense+sparse embeddings via Colab, and stores named-vector points in Qdrant.",
+        "operationId": "upload_clinical_pdf_api_v1_ingestion_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_clinical_pdf_api_v1_ingestion_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/retrieval/search": {
+      "post": {
+        "tags": [
+          "Retrieval"
+        ],
+        "summary": "Execute hybrid search (dense + sparse) with RRF fusion and cross-encoder reranking.",
+        "description": "Perform hybrid retrieval on ingested clinical documents, returning ranked results with metadata provenance.",
+        "operationId": "search_clinical_documents_api_v1_retrieval_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/retrieval/rerank": {
+      "post": {
+        "tags": [
+          "Retrieval"
+        ],
+        "summary": "Standalone cross-encoder reranking endpoint for custom query and candidate texts.",
+        "description": "Perform standalone cross-encoder reranking on arbitrary query and list of candidate documents.",
+        "operationId": "rerank_documents_api_v1_retrieval_rerank_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RerankRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RerankResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/generation/generate": {
+      "post": {
+        "tags": [
+          "Clinical Generation"
+        ],
+        "summary": "Generate concise First Aid emergency guidance with citation tracking",
+        "description": "Executes end-to-end First Aid Clinical Decision Support pipeline. Retrieves candidates via hybrid search, applies 80% similarity threshold filtering, enforces scope & knowledge sufficiency AND-Gate guardrails, and generates concise bullet-point emergency instructions in the user's query language with exact chunk citations.",
+        "operationId": "generate_api_v1_generation_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Health Check",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_upload_clinical_pdf_api_v1_ingestion_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_clinical_pdf_api_v1_ingestion_upload_post"
+      },
+      "Citation": {
+        "properties": {
+          "chunk_id": {
+            "type": "string",
+            "title": "Chunk Id",
+            "description": "Unique chunk identifier."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Source PDF filename."
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id",
+            "description": "Unique document identifier."
+          },
+          "recommendation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation Id",
+            "description": "Clinical recommendation ID if present."
+          },
+          "pdf_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pdf Page",
+            "description": "PDF page number."
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section",
+            "description": "Document section header."
+          },
+          "source_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Text",
+            "description": "Original text content of the cited chunk."
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score",
+            "description": "Similarity score (0.0 to 1.0)."
+          },
+          "percentage_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentage Score",
+            "description": "Similarity percentage score (e.g. 88.5%)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "chunk_id"
+        ],
+        "title": "Citation",
+        "description": "Citation metadata identifying a chunk used in the clinical response."
+      },
+      "ClinicalLLMResponse": {
+        "properties": {
+          "is_in_scope": {
+            "type": "boolean",
+            "title": "Is In Scope",
+            "description": "True if the query is strictly about First Aid or Emergency management. False for other topics."
+          },
+          "is_knowledge_sufficient": {
+            "type": "boolean",
+            "title": "Is Knowledge Sufficient",
+            "description": "True if the provided context contains enough accurate information to confidently answer the query. False otherwise."
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer",
+            "description": "The concise first-aid answer in bullet points with citations. MUST be None if either flag is False."
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "type": "array",
+            "title": "Citations",
+            "description": "List of citations for candidate chunks actually used to construct the answer. MUST be empty if answer is None."
+          },
+          "refusal_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refusal Reason",
+            "description": "Polite explanation if the request is out of scope or context is insufficient."
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "description": "The LLM provider name used.",
+            "default": "gemini"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name",
+            "description": "Model name used for generation.",
+            "default": "gemini-3.1-flash-lite"
+          },
+          "filtered_chunks_count": {
+            "type": "integer",
+            "title": "Filtered Chunks Count",
+            "description": "Number of context chunks passing the >=80% threshold.",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_in_scope",
+          "is_knowledge_sufficient"
+        ],
+        "title": "ClinicalLLMResponse",
+        "description": "Structured Pydantic Output schema for Clinical LLM Generation."
+      },
+      "GenerateRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Query",
+            "description": "Clinical query string."
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "GenerateRequest",
+        "description": "Input request schema for clinical generation API."
+      },
+      "GenerateResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ClinicalLLMResponse"
+          },
+          "retrieved_chunks_count": {
+            "type": "integer",
+            "title": "Retrieved Chunks Count",
+            "description": "Total chunks retrieved before threshold filtering.",
+            "default": 0
+          },
+          "filtered_chunks_count": {
+            "type": "integer",
+            "title": "Filtered Chunks Count",
+            "description": "Chunks passing >=80% similarity threshold (max 3 passed to LLM).",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "result"
+        ],
+        "title": "GenerateResponse",
+        "description": "API Response schema for clinical generation API."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IngestionResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "chunks_created": {
+            "type": "integer",
+            "title": "Chunks Created"
+          },
+          "vectors_stored": {
+            "type": "integer",
+            "title": "Vectors Stored"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "document_id",
+          "filename",
+          "chunks_created",
+          "vectors_stored"
+        ],
+        "title": "IngestionResponse",
+        "description": "Response returned upon completion of file ingestion upload."
+      },
+      "RerankRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Query",
+            "description": "Clinical query string"
+          },
+          "documents": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Documents",
+            "description": "List of document texts to rerank against the query"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "documents"
+        ],
+        "title": "RerankRequest",
+        "description": "Standalone rerank request payload."
+      },
+      "RerankResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "scores": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Scores"
+          },
+          "results": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "scores",
+          "results"
+        ],
+        "title": "RerankResponse",
+        "description": "Standalone rerank response payload."
+      },
+      "SearchRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Query",
+            "description": "Clinical query string"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "SearchRequest",
+        "description": "Retrieval search endpoint request payload."
+      },
+      "SearchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SearchResult"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "results"
+        ],
+        "title": "SearchResponse",
+        "description": "Retrieval search response payload."
+      },
+      "SearchResult": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "percentage_score": {
+            "type": "number",
+            "title": "Percentage Score"
+          },
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "pdf_page": {
+            "type": "integer",
+            "title": "Pdf Page"
+          },
+          "document_page": {
+            "type": "integer",
+            "title": "Document Page"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section",
+            "default": ""
+          },
+          "recommendation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation Id"
+          },
+          "is_table": {
+            "type": "boolean",
+            "title": "Is Table",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "score",
+          "percentage_score",
+          "document_id",
+          "source",
+          "pdf_page",
+          "document_page"
+        ],
+        "title": "SearchResult",
+        "description": "Individual search result item returned to API clients with full provenance."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
