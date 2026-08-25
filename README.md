@@ -1,189 +1,296 @@
-# Clinical RAG MVP — Phase 1 & Phase 2
+# 🏥 Clinical RAG — Emergency First Aid Clinical Decision Support System
 
-A modular, SOLID-compliant FastAPI service for clinical document ingestion, hybrid retrieval (dense + sparse), Reciprocal Rank Fusion (RRF), cross-encoder reranking, and a modern React Frontend UI.
+A modular, SOLID-compliant Clinical RAG (Retrieval-Augmented Generation) system for emergency First Aid guidance. Built with **FastAPI**, **Qdrant Vector Database**, **Docling**, **BAAI/bge-m3** (Dense + Sparse Embeddings), **bge-reranker-v2-m3** (Cross-Encoder Reranking), **Google Gemini LLM**, and a modern **React 19 / TanStack Start Frontend UI**.
 
 ---
 
-## 🚀 Getting Started / طريقة تشغيل المشروع
+## 📄 OpenAPI Specification (`openapi.json`)
 
-Follow these steps in order to start the full system:
+> [!IMPORTANT]
+> A complete, fully typed **OpenAPI 3.1.0** schema is provided in the repository at **[`openapi.json`](./openapi.json)**.
+> 
+> You can import `openapi.json` into Postman, Insomnia, or any API client.  
+> Interactive documentation is also available out-of-the-box when running the backend:
+> - 📍 **Swagger UI Docs:** `http://localhost:3000/docs`
+> - 📍 **ReDoc Interactive Docs:** `http://localhost:3000/redoc`
+
+---
+
+## 🚀 Quick Start & Setup Guide / طريقة التشغيل
 
 ### 📋 Prerequisites
-1. **Docker Desktop** installed and running.
-2. **Python 3.10+** (Conda environment `clinical-rag` recommended).
-3. **Node.js 18+** & `npm`.
+- **Docker Desktop** (running locally)
+- **Python 3.10+** (Conda environment `clinical-rag` recommended)
+- **Node.js 18+** & `npm`
 
 ---
 
-### 1️⃣ Step 1: Open Docker Desktop & Start Vector DB
-First, launch **Docker Desktop**. Once Docker is active, run the following command from the project root directory (`d:\Clinical_Hackathon`) to start the Qdrant container:
+### 1️⃣ Step 1: Launch Vector Database (Qdrant)
+Start the Qdrant vector database container via Docker Compose from the project root:
 
 ```bash
 docker compose up -d
 ```
-> 📍 **Qdrant Vector DB:** Running at `http://localhost:6333`
+> 📍 **Qdrant Dashboard & API:** `http://localhost:6333`
 
 ---
 
-### 2️⃣ Step 2: Run Google Colab GPU Service & Start FastAPI Backend
-
-1. **Run Google Colab Notebook:**
-   - Open and run the Google Colab GPU notebook (for `BAAI/bge-m3` embedding and `bge-reranker-v2-m3` reranking services).
-   - Copy the generated `ngrok` public URL (e.g., `https://xxxx.ngrok-free.app`).
-   - Update your `.env` file in the root directory with the ngrok URL:
-     ```ini
-     EMBEDDING_API_URL=https://your-ngrok-domain.ngrok-free.app
-     RERANKER_API_URL=https://your-ngrok-domain.ngrok-free.app
-     ```
-
-2. **Start the FastAPI Backend:**
-   Open a terminal, activate your environment, navigate to the `src` folder, and start Uvicorn:
+### 2️⃣ Step 2: Configure Environment Variables
+Copy `.env.example` to `.env` in the root directory:
 
 ```bash
-# Activate Conda environment
-conda activate clinical-rag
-
-# Navigate to backend directory and start server
-cd src
-uvicorn main:app --host 0.0.0.0 --port 3000 --reload
-```
-> 📍 **Backend API:** `http://localhost:3000`  
-> 📍 **Swagger Docs:** `http://localhost:3000/docs`
-
----
-
-### 3️⃣ Step 3: Start the Frontend UI
-Open a **new terminal**, navigate to `src/UI`, install dependencies (if not done previously), and start Vite:
-
-```bash
-# Navigate to UI directory
-cd src/UI
-
-# Install dependencies (first time only)
-npm install
-
-# Run Vite dev server
-npm run dev
-```
-> 📍 **Frontend UI:** `http://localhost:8080/`
-
----
-
-## 🏗️ End-to-End Architecture Overview
-
-```text
-=================== PHASE 1: INGESTION PIPELINE ===================
-Uploaded PDF ──► DoclingProvider ──► CleaningService ──► ChunkingService
-                                                               │
-                                                               ▼
-                                                   ColabEmbeddingProvider
-                                                   (Dense + Sparse BGE-M3 API)
-                                                               │
-                                                               ▼
-                                                       QdrantProvider
-                                               (Named Vectors: dense + sparse)
-
-=================== PHASE 2: HYBRID RETRIEVAL & RERANKING ===================
-Query (text)
-    │
-    ▼
-ColabEmbeddingProvider.embed_query() ──► Dense Vector (1024) + Sparse Vector (indices/values)
-    │
-    ▼
-QdrantProvider.hybrid_search()      ──► Top DENSE_TOP_K & Top SPARSE_TOP_K candidate lists
-    │
-    ▼
-RetrievalService.RRF_fusion()       ──► Reciprocal Rank Fusion (RRF) ──► Top HYBRID_TOP_K candidates
-    │
-    ▼
-RerankingService / ColabReranker    ──► BAAI/bge-reranker-v2-m3 (or NoOpReranker Fallback)
-    │
-    ▼
-Top RERANK_TOP_K Ranked Results with Provenance Metadata (page, section, recommendation_id, is_table)
+cp .env.example .env
 ```
 
----
-
-## ⚡ Configuration & Environment Variables
-
-Update `.env` in the root directory with your configuration:
-
+Configure your `.env` settings:
 ```ini
 APP_NAME=clinical-rag
 DEBUG=true
 
 # Qdrant Settings
 QDRANT_URL=http://localhost:6333
-QDRANT_API_KEY=
 QDRANT_COLLECTION_NAME=clinical_documents
 
-# Remote Colab Embedding Service
+# Remote GPU Embedding & Reranker Service (Google Colab / ngrok)
 EMBEDDING_API_URL=https://your-ngrok-domain.ngrok-free.app
-EMBEDDING_API_KEY=
-EMBEDDING_MODEL=BAAI/bge-m3
-EMBEDDING_DIMENSION=1024
-EMBEDDING_TIMEOUT=30
-EMBEDDING_BATCH_SIZE=32
-
-# Retrieval & Search Settings
-DENSE_TOP_K=20
-SPARSE_TOP_K=20
-HYBRID_TOP_K=20
-RERANK_TOP_K=10
-RRF_K=60
-
-# Remote Colab Cross-Encoder Reranker Service
 RERANKER_ENABLED=true
 RERANKER_API_URL=https://your-ngrok-domain.ngrok-free.app
-RERANKER_API_KEY=
-RERANKER_TIMEOUT=30
+
+# Gemini LLM Provider Key
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-1.5-flash
+MIN_SIMILARITY_SCORE_THRESHOLD=80.0
 ```
 
 ---
 
-## 📡 API Endpoints
-
-### 1. 🤖 Generation Endpoint (`POST /api/v1/generation/generate`)
-Used by the frontend to obtain evidence-based clinical guidance:
+### 3️⃣ Step 3: Start FastAPI Backend Server
+Navigate to `src/` and launch the Uvicorn server on port **3000**:
 
 ```bash
-curl -X POST "http://localhost:3000/api/v1/generation/generate" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "What should I do for a severe burn on the arm?"}'
+# Activate python environment
+conda activate clinical-rag
+
+# Run backend server
+cd src
+uvicorn main:app --host 0.0.0.0 --port 3000 --reload
+```
+> 📍 **Backend Base URL:** `http://localhost:3000`  
+> 📍 **Swagger API Documentation:** `http://localhost:3000/docs`
+
+---
+
+### 4️⃣ Step 4: Start React Frontend UI
+In a **new terminal**, navigate to `src/UI` and run the development server:
+
+```bash
+cd src/UI
+
+# Install dependencies (first time only)
+npm install
+
+# Start Vite dev server
+npm run dev
+```
+> 📍 **Frontend Web App:** `http://localhost:8080`
+
+---
+
+## 📡 API Endpoints Specification
+
+The table below summarizes all active API routes in the system:
+
+| Method | Endpoint | Description | Request Payload | Response Model |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/generation/generate` | Emergency First Aid LLM decision support with citations | `GenerateRequest` (JSON) | `GenerateResponse` (JSON) |
+| `POST` | `/api/v1/ingestion/upload` | Upload & ingest clinical PDF document into Qdrant | `multipart/form-data` (File) | `IngestionResponse` (JSON) |
+| `POST` | `/api/v1/retrieval/search` | Hybrid search (Dense+Sparse BGE-M3) + RRF + Reranker | `SearchRequest` (JSON) | `SearchResponse` (JSON) |
+| `POST` | `/api/v1/retrieval/rerank` | Standalone cross-encoder reranking endpoint | `RerankRequest` (JSON) | `RerankResponse` (JSON) |
+| `GET` | `/health` | API Health & status check | None | Status JSON |
+
+---
+
+### Detailed Endpoint Breakdown
+
+#### 1. 🤖 Generation Endpoint (`POST /api/v1/generation/generate`)
+Executes the end-to-end First Aid Clinical Decision Support pipeline.
+- Performs hybrid search against vector database.
+- Filters candidate chunks by a strict **80% similarity threshold**.
+- Enforces double guardrails: **Is In Scope** (First Aid) & **Is Knowledge Sufficient**.
+- Generates concise bullet-point instructions in the user's query language with exact chunk citations.
+
+**Request Body (`application/json`):**
+```json
+{
+  "query": "What should I do immediately for a second-degree burn on the arm?"
+}
 ```
 
-### 2. 🔍 Hybrid Search Endpoint (`POST /api/v1/retrieval/search`)
-
-```bash
-curl -X POST "http://localhost:3000/api/v1/retrieval/search" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "What HbA1c target is recommended for adults with type 2 diabetes?"}'
+**Response (`200 OK`):**
+```json
+{
+  "query": "What should I do immediately for a second-degree burn on the arm?",
+  "retrieved_chunks_count": 10,
+  "filtered_chunks_count": 3,
+  "result": {
+    "is_in_scope": true,
+    "is_knowledge_sufficient": true,
+    "answer": "• Cool the burn under cool running water for at least 20 minutes [1].\n• Remove any clothing or jewelry near the burned area unless stuck to skin [1].\n• Cover the burn loosely with sterile non-adherent dressing or clean plastic wrap [1].",
+    "citations": [
+      {
+        "chunk_id": "doc_123_chunk_4",
+        "source": "First_Aid_Manual.pdf",
+        "pdf_page": 45,
+        "section": "Thermal Burns",
+        "recommendation_id": "REC-BURN-01",
+        "source_text": "Cool the burn immediately under cool running water...",
+        "score": 0.895,
+        "percentage_score": 89.5
+      }
+    ],
+    "refusal_reason": null,
+    "provider": "gemini",
+    "model_name": "gemini-1.5-flash",
+    "filtered_chunks_count": 3
+  }
+}
 ```
 
 ---
 
-## 🔄 Fusion & Reranking Strategy
+#### 2. 📄 Ingestion Upload Endpoint (`POST /api/v1/ingestion/upload`)
+Uploads a clinical PDF document, parses it with **Docling**, cleans headers/footers, tokenizes chunks, extracts NICE/ESC metadata, computes BAAI/bge-m3 dense & sparse vectors, and indexes them into Qdrant.
 
-### 1. Reciprocal Rank Fusion (RRF)
-Raw similarity scores from dense cosine distance and sparse lexical weights operate on completely different scales. To combine candidate items without biased weighting, we apply **Reciprocal Rank Fusion**:
+**Request Body (`multipart/form-data`):**
+- `file`: PDF binary file (`.pdf`)
 
-$$\text{RRF\_Score}(d) = \sum_{m \in \{\text{dense}, \text{sparse}\}} \frac{1}{k + \text{rank}_m(d)}$$
+**Response (`200 OK`):**
+```json
+{
+  "status": "success",
+  "document_id": "a1b2c3d4e5f6...",
+  "filename": "First_Aid_Manual.pdf",
+  "chunks_created": 42,
+  "vectors_stored": 42,
+  "message": "Successfully processed and indexed document."
+}
+```
 
-Where:
-- $k = 60$ (configurable via `RRF_K`).
-- $\text{rank}_m(d)$ is the 1-indexed position of document $d$ in result set $m$.
-- RRF merges candidate items into the top `HYBRID_TOP_K` (20) documents.
+---
 
-### 2. Cross-Encoder Reranking (`ColabReranker`) & Graceful Fallback (`NoOpReranker`)
-- Candidate items from RRF fusion are submitted to the GPU cross-encoder (`BAAI/bge-reranker-v2-m3`) in **one single batch call**.
-- Scores returned by the reranker endpoint correspond strictly to candidate index order. Reranked documents are then explicitly sorted descending by the cross-encoder score before returning the top `RERANK_TOP_K` (10) items.
-- If the remote reranker endpoint is disabled (`RERANKER_ENABLED=false`) or unreachable, `RerankingService` automatically degrades to `NoOpReranker`, logging a warning and preserving the fused RRF ranking without failing search requests.
+#### 3. 🔍 Hybrid Search Endpoint (`POST /api/v1/retrieval/search`)
+Executes hybrid search combining dense cosine vectors and sparse BM25-like lexical weights, merges candidate lists using Reciprocal Rank Fusion (RRF), and applies GPU cross-encoder reranking (`BAAI/bge-reranker-v2-m3`).
+
+**Request Body (`application/json`):**
+```json
+{
+  "query": "How to handle acute anaphylaxis emergency?"
+}
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "query": "How to handle acute anaphylaxis emergency?",
+  "results": [
+    {
+      "text": "Administer intramuscular epinephrine (0.3mg 1:1000) immediately into lateral thigh...",
+      "score": 0.92,
+      "percentage_score": 92.0,
+      "document_id": "doc_987",
+      "source": "Anaphylaxis_Protocol.pdf",
+      "pdf_page": 12,
+      "document_page": 12,
+      "section": "Emergency Interventions",
+      "recommendation_id": "REC-ANAPH-02",
+      "is_table": false
+    }
+  ]
+}
+```
+
+---
+
+#### 4. ⚖️ Standalone Rerank Endpoint (`POST /api/v1/retrieval/rerank`)
+Exposes cross-encoder reranking directly to grade arbitrary query-document pairs.
+
+**Request Body (`application/json`):**
+```json
+{
+  "query": "treatment for severe hypothermia",
+  "documents": [
+    "Apply warm dry blankets and transport to medical facility immediately.",
+    "Give aspirin for headache."
+  ]
+}
+```
+
+**Response (`200 OK`):**
+```json
+{
+  "query": "treatment for severe hypothermia",
+  "scores": [0.942, 0.012],
+  "results": [
+    { "index": 0, "score": 0.942, "text": "Apply warm dry blankets..." },
+    { "index": 1, "score": 0.012, "text": "Give aspirin..." }
+  ]
+}
+```
+
+---
+
+#### 5. 🟢 Health Check Endpoint (`GET /health`)
+Verifies service availability.
+
+**Response (`200 OK`):**
+```json
+{
+  "status": "healthy",
+  "app_name": "clinical-rag"
+}
+```
+
+---
+
+## 🏗️ Architecture & Pipeline Flow
+
+```text
+=================== INGESTION PIPELINE ===================
+Uploaded PDF ──► Docling Parser ──► Furniture Cleaner ──► BGE Tokenizer Chunker
+                                                                 │
+                                                                 ▼
+                                                     Colab BGE-M3 Embedding API
+                                                    (Dense 1024d + Sparse Lexical)
+                                                                 │
+                                                                 ▼
+                                                         Qdrant Vector DB
+                                                 (Named Vectors: dense + sparse)
+
+=================== HYBRID RETRIEVAL & RERANKING ===================
+User Query ──► BGE-M3 Embedder ──► Qdrant Hybrid Search (Dense Top-20 & Sparse Top-20)
+                                                 │
+                                                 ▼
+                                     Reciprocal Rank Fusion (RRF)
+                                                 │
+                                                 ▼
+                                     GPU BGE Cross-Encoder Reranker
+                                                 │
+                                                 ▼
+                                   >=80% Score Threshold Filter
+                                                 │
+                                                 ▼
+                                 Gemini LLM (Scope & Knowledge Check)
+                                                 │
+                                                 ▼
+                                   Bullet Answer + Exact Citations
+```
 
 ---
 
 ## 🧪 Testing
 
-Run the full automated pytest suite:
+Execute automated unit tests with `pytest`:
+
 ```bash
 python -m pytest
 ```
