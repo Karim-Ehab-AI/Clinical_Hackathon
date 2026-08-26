@@ -3,6 +3,7 @@ from typing import List, Dict, Optional
 
 from interfaces.embedding_provider import EmbeddingProvider
 from interfaces.vector_store import VectorStore
+from providers.local_embedding_provider import LocalEmbeddingProvider
 from providers.colab_embedding_provider import ColabEmbeddingProvider
 from providers.qdrant_provider import QdrantProvider
 from services.reranking_service import RerankingService
@@ -10,6 +11,13 @@ from schemas.retrieval import RerankedDocument, SearchResult, SearchResponse, Re
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+
+def get_default_embedding_provider() -> EmbeddingProvider:
+    """Instantiate default embedding provider based on application settings."""
+    if settings.EMBEDDING_PROVIDER_TYPE == "remote" and settings.EMBEDDING_API_URL:
+        return ColabEmbeddingProvider()
+    return LocalEmbeddingProvider()
 
 
 class RetrievalService:
@@ -21,7 +29,7 @@ class RetrievalService:
         vector_store: Optional[VectorStore] = None,
         reranking_service: Optional[RerankingService] = None,
     ):
-        self.embedding_provider = embedding_provider or ColabEmbeddingProvider()
+        self.embedding_provider = embedding_provider or get_default_embedding_provider()
         self.vector_store = vector_store or QdrantProvider()
         self.reranking_service = reranking_service or RerankingService()
 
@@ -169,5 +177,3 @@ class RetrievalService:
             for i, doc in enumerate(reranked)
         ]
         return RerankResponse(query=query, scores=scores, results=results)
-
-

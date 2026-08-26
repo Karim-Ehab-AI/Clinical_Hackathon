@@ -42,8 +42,9 @@ def health_check():
     return {
         "status": "healthy",
         "app": settings.APP_NAME,
+        "embedding_provider": settings.EMBEDDING_PROVIDER_TYPE,
+        "docling_provider": settings.DOCLING_PROVIDER_TYPE,
         "qdrant_url": settings.QDRANT_URL,
-        "embedding_api_url": settings.EMBEDDING_API_URL,
     }
 
 

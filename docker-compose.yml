@@ -10,6 +10,60 @@ services:
       - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: clinical_backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - APP_NAME=clinical-rag
+      - DEBUG=false
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION_NAME=clinical_documents
+      - EMBEDDING_PROVIDER_TYPE=local
+      - EMBEDDING_MODEL=BAAI/bge-m3
+      - EMBEDDING_DIMENSION=1024
+      - EMBEDDING_DEVICE=auto
+      - DOCLING_PROVIDER_TYPE=local
+      - DOCLING_DO_OCR=false
+      - ASSETS_DIR=src/assets
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+      - MIN_SIMILARITY_SCORE_THRESHOLD=80.0
+    volumes:
+      - ./src/assets:/app/src/assets
+      - hf_cache:/app/.cache/huggingface
+    depends_on:
+      - qdrant
+    # To enable GPU acceleration on AWS GPU instances (e.g. g4dn/g5 with NVIDIA Container Toolkit):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  streamlit-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: clinical_ui
+    restart: always
+    ports:
+      - "8501:8501"
+    environment:
+      - BACKEND_API_URL=http://backend:3000
+    command: ["streamlit", "run", "/app/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    depends_on:
+      - backend
 
 volumes:
   qdrant_data:
+  hf_cache:

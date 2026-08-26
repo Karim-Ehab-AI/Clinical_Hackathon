@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple
+from typing import Tuple, Optional
 from interfaces.document_parser import DocumentParser
 from interfaces.embedding_provider import EmbeddingProvider
 from services.storage_service import StorageService
@@ -19,13 +19,13 @@ class DocumentService:
 
     def __init__(
         self,
-        parser: DocumentParser = None,
-        embedding_provider: EmbeddingProvider = None,
-        vector_store_service: VectorStoreService = None,
-        storage_service: StorageService = None,
-        cleaning_service: CleaningService = None,
-        chunking_service: ChunkingService = None,
-        pdf_pipeline: PDFChunkingPipeline = None,
+        parser: Optional[DocumentParser] = None,
+        embedding_provider: Optional[EmbeddingProvider] = None,
+        vector_store_service: Optional[VectorStoreService] = None,
+        storage_service: Optional[StorageService] = None,
+        cleaning_service: Optional[CleaningService] = None,
+        chunking_service: Optional[ChunkingService] = None,
+        pdf_pipeline: Optional[PDFChunkingPipeline] = None,
     ):
         self.parser = parser
         self.embedding_provider = embedding_provider
@@ -37,7 +37,7 @@ class DocumentService:
         self.qdrant_provider = QdrantProvider()
 
     async def process_pdf(self, file_name: str, content: bytes) -> IngestionResponse:
-        """Run full Phase 1 hybrid ingestion pipeline for uploaded PDF file."""
+        """Run full PDF ingestion pipeline (Local in-process on AWS or remote fallback)."""
         # Step 1: Save file to src/assets/{file_hash}.pdf and check deduplication
         file_hash, file_path, file_exists = self.storage_service.save_file(content)
 
@@ -53,13 +53,15 @@ class DocumentService:
                 message="Document already ingested in assets storage and vector store.",
             )
 
-        # Step 2: Run hybrid remote chunking & local metadata enrichment pipeline
-        logger.info(f"Running hybrid remote chunking & metadata pipeline for: {file_name} (ID: {file_hash})")
-        remote_url = settings.EMBEDDING_API_URL.rstrip("/")
+        # Step 2: Run PDF Chunking & Embedding Pipeline (Local or Remote)
+        logger.info(
+            f"Running PDF chunking & embedding pipeline for: {file_name} (ID: {file_hash}) "
+            f"[Mode: {settings.DOCLING_PROVIDER_TYPE}/{settings.EMBEDDING_PROVIDER_TYPE}]"
+        )
         
-        chunks = await self.pdf_pipeline.process_pdf_remote(
+        chunks = await self.pdf_pipeline.process_pdf(
             pdf_path=file_path,
-            remote_base_url=remote_url,
+            embedding_provider=self.embedding_provider,
         )
 
         if not chunks:
@@ -75,5 +77,5 @@ class DocumentService:
             filename=file_name,
             chunks_created=len(chunks),
             vectors_stored=stored_count,
-            message="Hybrid PDF ingestion pipeline completed successfully.",
+            message="PDF ingestion pipeline completed successfully.",
         )

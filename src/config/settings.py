@@ -18,13 +18,19 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: str = ""
     QDRANT_COLLECTION_NAME: str = "clinical_documents"
 
-    # Embedding Provider (Colab BGE-M3 HTTP Service)
-    EMBEDDING_API_URL: str = "http://localhost:8000"
-    EMBEDDING_API_KEY: str = ""
+    # Embedding Provider Configuration (Default: Local in-process BGE-M3 for AWS)
+    EMBEDDING_PROVIDER_TYPE: str = "local"  # "local" | "remote"
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
     EMBEDDING_DIMENSION: int = 1024
-    EMBEDDING_TIMEOUT: int = 30
+    EMBEDDING_DEVICE: str = "auto"  # "auto" | "cuda" | "cpu"
     EMBEDDING_BATCH_SIZE: int = 32
+    EMBEDDING_TIMEOUT: int = 30
+    EMBEDDING_API_URL: str = ""  # Used when EMBEDDING_PROVIDER_TYPE="remote"
+    EMBEDDING_API_KEY: str = ""
+
+    # Docling & PDF Processing
+    DOCLING_PROVIDER_TYPE: str = "local"  # "local" | "remote"
+    DOCLING_DO_OCR: bool = False
 
     # Storage Settings
     ASSETS_DIR: str = "src/assets"
@@ -36,7 +42,7 @@ class Settings(BaseSettings):
     RERANK_TOP_K: int = 10
     RRF_K: int = 60
 
-    # Reranker Provider Settings (Colab BGE Cross-Encoder Service)
+    # Reranker Settings (Disabled by default)
     RERANKER_ENABLED: bool = False
     RERANKER_API_URL: str = ""
     RERANKER_API_KEY: str = ""
@@ -53,4 +59,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

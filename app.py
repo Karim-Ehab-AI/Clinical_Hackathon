@@ -1,9 +1,10 @@
+import os
 import streamlit as st
 import requests
 from typing import Dict, Any, List
 
 # Backend API Configuration
-API_BASE_URL = "http://localhost:3000"
+API_BASE_URL = os.getenv("BACKEND_API_URL", "http://localhost:3000")
 HEALTH_URL = f"{API_BASE_URL}/health"
 INGEST_URL = f"{API_BASE_URL}/api/v1/ingestion/ingest-pdf"
 GENERATE_URL = f"{API_BASE_URL}/api/v1/generation/generate"
